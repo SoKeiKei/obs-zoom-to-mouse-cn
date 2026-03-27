@@ -1,0 +1,2820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS 鼠标缩放脚本 - 功能对比与使用指南</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #050508;
+            --bg-secondary: #0d0d14;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --bg-glass: rgba(255, 255, 255, 0.06);
+            --accent-cyan: #00f0ff;
+            --accent-blue: #5b7fff;
+            --accent-purple: #a855f7;
+            --accent-pink: #ff6b9d;
+            --accent-orange: #ff8a5c;
+            --text-primary: #ffffff;
+            --text-secondary: #8892b0;
+            --text-muted: #5a6478;
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --sidebar-width: 280px;
+        }
+
+        body {
+            font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Noto Sans SC', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+            line-height: 1.6;
+        }
+
+        /* 粒子背景 */
+        .particle-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-blue) 0%, transparent 70%);
+            opacity: 0.4;
+            animation: float 25s infinite ease-in-out;
+            filter: blur(1px);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+            50% { transform: translateY(-100vh) rotate(180deg); opacity: 0.6; }
+        }
+
+        /* 渐变光晕 */
+        .glow-effect {
+            position: fixed;
+            width: 800px;
+            height: 800px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, transparent 70%);
+            filter: blur(80px);
+            animation: glowMove 20s infinite ease-in-out;
+            z-index: 0;
+        }
+
+        .glow-1 { top: -300px; left: -300px; }
+        .glow-2 { bottom: -300px; right: -300px; animation-delay: -10s; background: radial-gradient(circle, rgba(0, 240, 255, 0.1) 0%, transparent 70%); }
+        .glow-3 { top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(91, 127, 255, 0.08) 0%, transparent 70%); animation-duration: 25s; }
+
+        @keyframes glowMove {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(100px, -100px) scale(1.15); }
+            66% { transform: translate(-50px, 150px) scale(0.9); }
+        }
+
+        /* 侧边导航 */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, rgba(13, 13, 20, 0.95) 0%, rgba(5, 5, 8, 0.98) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            z-index: 1000;
+            border-right: 1px solid var(--border-glass);
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-glass);
+            border-radius: 2px;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid var(--border-glass);
+            margin-bottom: 25px;
+        }
+
+        .sidebar-logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 8px 30px rgba(0, 240, 255, 0.25);
+        }
+
+        .sidebar-logo-text h2 {
+            font-size: 14px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.3px;
+        }
+
+        .sidebar-logo-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            padding-left: 12px;
+        }
+
+        .nav-list {
+            list-style: none;
+            margin-bottom: 30px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-blue));
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .nav-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .nav-item:hover {
+            background: var(--bg-glass);
+            padding-left: 20px;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.1) 0%, rgba(91, 127, 255, 0.08) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--accent-cyan);
+        }
+
+        .nav-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-content {
+            flex: 1;
+        }
+
+        .nav-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .nav-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .nav-number {
+            width: 24px;
+            height: 24px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .nav-item.active .nav-number {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            color: var(--bg-primary);
+        }
+
+        /* B 站信息卡片 */
+        .bilibili-card {
+            background: linear-gradient(135deg, rgba(251, 118, 17, 0.15) 0%, rgba(255, 107, 157, 0.1) 100%);
+            border: 1px solid rgba(251, 118, 17, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bilibili-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(251, 118, 17, 0.1) 0%, transparent 70%);
+            animation: bilibiliPulse 4s ease-in-out infinite;
+        }
+
+        @keyframes bilibiliPulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .bilibili-card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .bilibili-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .bilibili-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #fb7617, #ff6b9d);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .bilibili-text {
+            flex: 1;
+        }
+
+        .bilibili-text strong {
+            font-size: 14px;
+            color: var(--text-primary);
+            display: block;
+        }
+
+        .bilibili-text span {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .bilibili-steps {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .bili-step {
+            flex: 1;
+            text-align: center;
+            padding: 10px 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .bili-step i {
+            display: block;
+            font-size: 18px;
+            margin-bottom: 6px;
+            color: #fb7617;
+        }
+
+        .bilibili-code {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .bilibili-code span {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .bilibili-code strong {
+            font-size: 20px;
+            background: linear-gradient(90deg, #fb7617, #ff6b9d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+
+        /* 顶部栏 */
+        .top-bar {
+            position: fixed;
+            top: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: 80px;
+            background: rgba(5, 5, 8, 0.8);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            z-index: 100;
+            border-bottom: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 50px;
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-title-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(91, 127, 255, 0.1));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--accent-cyan);
+        }
+
+        .page-title-text h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .page-title-text span {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .slide-counter {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-glass);
+            padding: 10px 20px;
+            border-radius: 24px;
+            border: 1px solid var(--border-glass);
+        }
+
+        .slide-counter span {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .slide-counter strong {
+            font-size: 16px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+
+        /* 幻灯片容器 */
+        .slides-container {
+            padding-top: 80px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 80px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 80px);
+            padding: 50px 60px 60px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(40px) scale(0.97);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+
+        .slide::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .slide::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .slide::-webkit-scrollbar-thumb {
+            background: var(--border-glass);
+            border-radius: 3px;
+        }
+
+        /* 封面页特殊样式 */
+        .cover-slide {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .cover-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(91, 127, 255, 0.1));
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .cover-badge i {
+            color: var(--accent-cyan);
+            font-size: 16px;
+        }
+
+        .cover-badge span {
+            font-size: 12px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .cover-icon {
+            font-size: 120px;
+            margin-bottom: 40px;
+            filter: drop-shadow(0 0 60px rgba(0, 240, 255, 0.4));
+            animation: iconPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes iconPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.08) rotate(8deg); }
+        }
+
+        .cover-title {
+            font-size: 68px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+            animation: titleGlow 5s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+
+        .cover-subtitle {
+            font-size: 22px;
+            color: var(--text-secondary);
+            margin-bottom: 50px;
+            font-weight: 400;
+        }
+
+        .version-cards {
+            display: flex;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .version-card {
+            background: linear-gradient(135deg, var(--bg-glass) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 28px 45px;
+            border-radius: 20px;
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            min-width: 220px;
+        }
+
+        .version-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+        }
+
+        .version-card:last-child::before {
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink));
+        }
+
+        .version-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 60px rgba(0, 240, 255, 0.15);
+        }
+
+        .version-card h3 {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .version-card p {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        /* 通用幻灯片样式 */
+        .slide-header {
+            margin-bottom: 45px;
+        }
+
+        .slide-title {
+            font-size: 44px;
+            font-weight: 800;
+            margin-bottom: 14px;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+
+        .slide-subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        /* 卡片网格 */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, var(--bg-glass) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 32px;
+            border-radius: 20px;
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.03), transparent);
+            transform: rotate(45deg);
+            transition: all 0.6s ease;
+        }
+
+        .feature-card:hover::before {
+            transform: rotate(45deg) translate(50%, 50%);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.3),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .feature-card.accent-blue:hover {
+            box-shadow: 0 16px 50px rgba(0, 240, 255, 0.12);
+        }
+
+        .feature-card.accent-purple:hover {
+            box-shadow: 0 16px 50px rgba(168, 85, 247, 0.12);
+        }
+
+        .feature-card.accent-pink:hover {
+            box-shadow: 0 16px 50px rgba(255, 107, 157, 0.12);
+        }
+
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(91, 127, 255, 0.1));
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 4px 20px rgba(0, 240, 255, 0.3));
+        }
+
+        .feature-card h3 {
+            font-size: 20px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-card ul {
+            list-style: none;
+            margin-top: 14px;
+        }
+
+        .feature-card li {
+            padding: 8px 0 8px 26px;
+            color: var(--text-secondary);
+            position: relative;
+            font-size: 14px;
+        }
+
+        .feature-card li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+            font-weight: 700;
+        }
+
+        /* 目录网格 */
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .toc-item {
+            background: linear-gradient(135deg, var(--bg-glass) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border-glass);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toc-item:hover {
+            transform: translateX(8px);
+            border-color: rgba(0, 240, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0, 240, 255, 0.12);
+        }
+
+        .toc-number {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+            flex-shrink: 0;
+            color: var(--bg-primary);
+            box-shadow: 0 6px 25px rgba(0, 240, 255, 0.35);
+        }
+
+        .toc-content h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .toc-content p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* 表格样式 */
+        .comparison-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: var(--bg-glass);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 16px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .comparison-table th {
+            background: rgba(255, 255, 255, 0.04);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(0, 240, 255, 0.04);
+        }
+
+        .check {
+            color: #10b981;
+            font-weight: 700;
+            font-size: 18px;
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .cross {
+            color: #ef4444;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .highlight {
+            background: rgba(0, 240, 255, 0.06);
+            position: relative;
+        }
+
+        .highlight::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-blue));
+        }
+
+        /* 表格参数 */
+        .params-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 14px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .params-table th,
+        .params-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-glass);
+            font-size: 14px;
+        }
+
+        .params-table th {
+            background: rgba(0, 240, 255, 0.08);
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .params-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* 流程图 */
+        .flow-chart {
+            background: var(--bg-glass);
+            padding: 26px;
+            border-radius: 16px;
+            border: 1px solid var(--border-glass);
+            margin-top: 26px;
+            backdrop-filter: blur(10px);
+        }
+
+        .flow-chart-title {
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 16px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--accent-cyan);
+            transition: all 0.3s ease;
+        }
+
+        .flow-step:hover {
+            background: rgba(0, 240, 255, 0.05);
+            transform: translateX(8px);
+        }
+
+        .flow-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .flow-step-number {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: var(--bg-primary);
+            margin-right: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+            font-size: 14px;
+        }
+
+        /* 代码块 */
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 14px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 13px;
+            line-height: 2;
+            border: 1px solid var(--border-glass);
+            margin-top: 16px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .keyword { color: #569cd6; }
+        .code-block .string { color: #ce9178; }
+        .code-block .number { color: #b5cea8; }
+        .code-block .function { color: #dcdcaa; }
+        .code-block .arrow { color: var(--accent-cyan); font-weight: 700; }
+
+        /* FAQ */
+        .faq-item {
+            background: var(--bg-glass);
+            border-radius: 14px;
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .faq-item:hover {
+            border-color: rgba(0, 240, 255, 0.25);
+            box-shadow: 0 8px 30px rgba(0, 240, 255, 0.08);
+        }
+
+        .faq-question {
+            padding: 20px 24px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .faq-question:hover {
+            background: rgba(0, 240, 255, 0.04);
+        }
+
+        .faq-question h3 {
+            font-size: 16px;
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .faq-icon {
+            width: 30px;
+            height: 30px;
+            background: var(--bg-glass);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--accent-cyan);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .faq-item.active .faq-icon {
+            transform: rotate(135deg);
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .faq-item.active .faq-answer {
+            max-height: 300px;
+        }
+
+        .faq-answer p {
+            padding: 0 24px 20px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        /* 时间轴 */
+        .timeline {
+            position: relative;
+            padding-left: 45px;
+            margin-top: 35px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 14px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-purple));
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -37px;
+            top: 8px;
+            width: 14px;
+            height: 14px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            border: 3px solid var(--bg-primary);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+        }
+
+        .timeline-content {
+            background: var(--bg-glass);
+            padding: 22px;
+            border-radius: 14px;
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .timeline-content:hover {
+            border-color: rgba(0, 240, 255, 0.25);
+            transform: translateX(8px);
+        }
+
+        .timeline-version {
+            font-size: 13px;
+            color: var(--accent-cyan);
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: inline-block;
+            padding: 5px 12px;
+            background: rgba(0, 240, 255, 0.1);
+            border-radius: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .timeline-content ul {
+            margin-left: 18px;
+            color: var(--text-secondary);
+        }
+
+        .timeline-content li {
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        /* 结束页 */
+        .end-slide {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .end-title {
+            font-size: 72px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+        }
+
+        .end-links {
+            display: flex;
+            gap: 20px;
+            margin-top: 45px;
+        }
+
+        .end-link {
+            background: linear-gradient(135deg, var(--bg-glass) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 28px 36px;
+            border-radius: 18px;
+            border: 1px solid var(--border-glass);
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            backdrop-filter: blur(10px);
+            min-width: 160px;
+        }
+
+        .end-link:hover {
+            transform: translateY(-6px);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 16px 50px rgba(0, 240, 255, 0.15);
+        }
+
+        .end-link-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(91, 127, 255, 0.1));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .end-link-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.04);
+            z-index: 100;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue), var(--accent-purple));
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+        }
+
+        /* 版权信息区块 */
+        .credit-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 35px;
+        }
+
+        .credit-card {
+            background: linear-gradient(135deg, var(--bg-glass) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 28px;
+            border-radius: 18px;
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            transition: all 0.4s ease;
+        }
+
+        .credit-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .credit-card h3 {
+            font-size: 16px;
+            margin-bottom: 18px;
+            color: var(--accent-cyan);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .credit-card p {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .credit-card a {
+            color: var(--accent-blue);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .credit-card a:hover {
+            color: var(--accent-cyan);
+            text-decoration: underline;
+        }
+
+        /* 高亮强调框 */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.06) 100%);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            margin-top: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .highlight-box h3 {
+            color: var(--accent-cyan);
+            margin-bottom: 12px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .highlight-box ul {
+            list-style: none;
+            margin-left: 10px;
+        }
+
+        .highlight-box li {
+            padding: 6px 0 6px 20px;
+            position: relative;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .highlight-box li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+            font-weight: 700;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            :root {
+                --sidebar-width: 240px;
+            }
+
+            .slide {
+                padding: 40px 35px 50px;
+            }
+
+            .cover-title {
+                font-size: 48px;
+            }
+
+            .slide-title {
+                font-size: 36px;
+            }
+
+            .version-cards,
+            .end-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+
+        /* 内容动画 */
+        .content-animate {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: contentFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes contentFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <!-- 粒子背景 -->
+    <div class="particle-bg" id="particleBg"></div>
+
+    <!-- 渐变光晕 -->
+    <div class="glow-effect glow-1"></div>
+    <div class="glow-effect glow-2"></div>
+    <div class="glow-effect glow-3"></div>
+
+    <!-- 侧边导航 -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <div class="sidebar-logo-icon">
+                <i class="ri-zoom-in-line"></i>
+            </div>
+            <div class="sidebar-logo-text">
+                <h2>OBS Zoom to Mouse</h2>
+                <p>中文威力加强版 v2.2</p>
+            </div>
+        </div>
+
+        <div class="sidebar-title">导航菜单</div>
+        <ul class="nav-list">
+            <li class="nav-item active" onclick="goToSlide(1)" data-nav="1">
+                <div class="nav-icon"><i class="ri-home-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">首页</div>
+                    <div class="nav-subtitle">项目介绍</div>
+                </div>
+                <div class="nav-number">1</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(2)" data-nav="2">
+                <div class="nav-icon"><i class="ri-menu-2-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">目录</div>
+                    <div class="nav-subtitle">内容导航</div>
+                </div>
+                <div class="nav-number">2</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(3)" data-nav="3">
+                <div class="nav-icon"><i class="ri-info-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">项目简介</div>
+                    <div class="nav-subtitle">核心功能</div>
+                </div>
+                <div class="nav-number">3</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(4)" data-nav="4">
+                <div class="nav-icon"><i class="ri-history-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">原版功能</div>
+                    <div class="nav-subtitle">v1.0.2</div>
+                </div>
+                <div class="nav-number">4</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(5)" data-nav="5">
+                <div class="nav-icon"><i class="ri-add-circle-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">新增功能</div>
+                    <div class="nav-subtitle">9 大增强</div>
+                </div>
+                <div class="nav-number">5</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(6)" data-nav="6">
+                <div class="nav-icon"><i class="ri-compare-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">功能对比</div>
+                    <div class="nav-subtitle">详细对比</div>
+                </div>
+                <div class="nav-number">6</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(7)" data-nav="7">
+                <div class="nav-icon"><i class="ri-translate-2"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">中文界面</div>
+                    <div class="nav-subtitle">本地化</div>
+                </div>
+                <div class="nav-number">7</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(8)" data-nav="8">
+                <div class="nav-icon"><i class="ri-flashlight-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">自动缩放</div>
+                    <div class="nav-subtitle">启动激活</div>
+                </div>
+                <div class="nav-number">8</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(9)" data-nav="9">
+                <div class="nav-icon"><i class="ri-ruler-2-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">动态宽高</div>
+                    <div class="nav-subtitle">智能适配</div>
+                </div>
+                <div class="nav-number">9</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(10)" data-nav="10">
+                <div class="nav-icon"><i class="ri-minimize-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">自动缩小</div>
+                    <div class="nav-subtitle">智能缩回</div>
+                </div>
+                <div class="nav-number">10</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(11)" data-nav="11">
+                <div class="nav-icon"><i class="ri-keyboard-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">输入检测</div>
+                    <div class="nav-subtitle">键盘保护</div>
+                </div>
+                <div class="nav-number">11</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(12)" data-nav="12">
+                <div class="nav-icon"><i class="ri-focus-3-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">二级缩放</div>
+                    <div class="nav-subtitle">双级控制</div>
+                </div>
+                <div class="nav-number">12</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(13)" data-nav="13">
+                <div class="nav-icon"><i class="ri-smooth-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">平滑跟随</div>
+                    <div class="nav-subtitle">专业手感</div>
+                </div>
+                <div class="nav-number">13</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(14)" data-nav="14">
+                <div class="nav-icon"><i class="ri-settings-3-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">基本设置</div>
+                    <div class="nav-subtitle">参数配置</div>
+                </div>
+                <div class="nav-number">14</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(15)" data-nav="15">
+                <div class="nav-icon"><i class="ri-mouse-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">跟随设置</div>
+                    <div class="nav-subtitle">跟踪配置</div>
+                </div>
+                <div class="nav-number">15</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(16)" data-nav="16">
+                <div class="nav-icon"><i class="ri-time-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">缩小设置</div>
+                    <div class="nav-subtitle">自动缩小</div>
+                </div>
+                <div class="nav-number">16</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(17)" data-nav="17">
+                <div class="nav-icon"><i class="ri-cursor-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">热键配置</div>
+                    <div class="nav-subtitle">快捷键</div>
+                </div>
+                <div class="nav-number">17</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(18)" data-nav="18">
+                <div class="nav-icon"><i class="ri-scene-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">使用场景</div>
+                    <div class="nav-subtitle">典型案例</div>
+                </div>
+                <div class="nav-number">18</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(19)" data-nav="19">
+                <div class="nav-icon"><i class="ri-question-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">常见问题</div>
+                    <div class="nav-subtitle">FAQ</div>
+                </div>
+                <div class="nav-number">19</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(20)" data-nav="20">
+                <div class="nav-icon"><i class="ri-download-cloud-2-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">安装指南</div>
+                    <div class="nav-subtitle">快速开始</div>
+                </div>
+                <div class="nav-number">20</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(21)" data-nav="21">
+                <div class="nav-icon"><i class="ri-time-flash-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">版本历史</div>
+                    <div class="nav-subtitle">更新日志</div>
+                </div>
+                <div class="nav-number">21</div>
+            </li>
+            <li class="nav-item" onclick="goToSlide(22)" data-nav="22">
+                <div class="nav-icon"><i class="ri-shield-keyhole-line"></i></div>
+                <div class="nav-content">
+                    <div class="nav-title">版权信息</div>
+                    <div class="nav-subtitle">许可声明</div>
+                </div>
+                <div class="nav-number">22</div>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 顶部栏 -->
+        <div class="top-bar">
+            <div class="page-title">
+                <div class="page-title-icon">
+                    <i class="ri-macbook-line"></i>
+                </div>
+                <div class="page-title-text">
+                    <h3>obs-zoom-to-mouse 中文威力加强版</h3>
+                    <span>OBS Mouse Zoom Script - Enhanced Chinese Edition</span>
+                </div>
+            </div>
+            <div class="slide-counter">
+                <span>幻灯片</span>
+                <strong id="currentSlide">1</strong>
+                <span>/ <span id="totalSlides">22</span></span>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- 幻灯片容器 -->
+        <div class="slides-container">
+
+            <!-- 幻灯片 1: 封面页 -->
+            <div class="slide cover-slide" data-slide="1">
+                <div class="cover-badge">
+                    <i class="ri-sparkling-line"></i>
+                    <span>中文威力加强版 v2.2</span>
+                </div>
+                <div class="cover-icon">🔍</div>
+                <h1 class="cover-title">OBS 鼠标缩放脚本</h1>
+                <p class="cover-subtitle">将显示器捕获源缩放到鼠标位置的专业工具</p>
+                <div class="version-cards">
+                    <div class="version-card">
+                        <h3><i class="ri-git-commit-line"></i> 原版</h3>
+                        <p>v1.0.2</p>
+                    </div>
+                    <div class="version-card">
+                        <h3><i class="ri-medal-line"></i> 增强版</h3>
+                        <p>v2.2 by SoKei</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 2: 目录 -->
+            <div class="slide" data-slide="2">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-compass-3-line"></i> 目录导航</h2>
+                    <p class="slide-subtitle">点击任意章节快速跳转</p>
+                </div>
+                <div class="toc-grid">
+                    <div class="toc-item" onclick="goToSlide(3)">
+                        <div class="toc-number">1</div>
+                        <div class="toc-content">
+                            <h3>项目简介</h3>
+                            <p>了解脚本的核心功能</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(4)">
+                        <div class="toc-number">2</div>
+                        <div class="toc-content">
+                            <h3>原版功能回顾</h3>
+                            <p>基础功能介绍</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(5)">
+                        <div class="toc-number">3</div>
+                        <div class="toc-content">
+                            <h3>增强版新增功能</h3>
+                            <p>9 大核心增强</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(6)">
+                        <div class="toc-number">4</div>
+                        <div class="toc-content">
+                            <h3>功能对比表</h3>
+                            <p>详细对比一览</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(7)">
+                        <div class="toc-number">5</div>
+                        <div class="toc-content">
+                            <h3>中文界面</h3>
+                            <p>完整本地化体验</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(8)">
+                        <div class="toc-number">6</div>
+                        <div class="toc-content">
+                            <h3>启动自动缩放</h3>
+                            <p>无需手动操作</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(9)">
+                        <div class="toc-number">7</div>
+                        <div class="toc-content">
+                            <h3>动态宽高比</h3>
+                            <p>智能适配画面</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(10)">
+                        <div class="toc-number">8</div>
+                        <div class="toc-content">
+                            <h3>自动缩小</h3>
+                            <p>智能缩回功能</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(11)">
+                        <div class="toc-number">9</div>
+                        <div class="toc-content">
+                            <h3>输入检测</h3>
+                            <p>键盘/滚轮保护</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(12)">
+                        <div class="toc-number">10</div>
+                        <div class="toc-content">
+                            <h3>二级缩放</h3>
+                            <p>双级缩放控制</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(13)">
+                        <div class="toc-number">11</div>
+                        <div class="toc-content">
+                            <h3>平滑跟随</h3>
+                            <p>专业级手感</p>
+                        </div>
+                    </div>
+                    <div class="toc-item" onclick="goToSlide(20)">
+                        <div class="toc-number">12</div>
+                        <div class="toc-content">
+                            <h3>安装与开始</h3>
+                            <p>快速上手指南</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 3: 项目简介 -->
+            <div class="slide" data-slide="3">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-rocket-line"></i> 什么是 OBS 鼠标缩放脚本？</h2>
+                    <p class="slide-subtitle">一个强大的 OBS Studio Lua 脚本</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-target-line"></i></div>
+                        <h3>核心功能</h3>
+                        <p>将显示器捕获源缩放到鼠标位置，让观众聚焦于您想展示的区域</p>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-equalizer-line"></i></div>
+                        <h3>主要特点</h3>
+                        <ul>
+                            <li>自定义缩放倍数（1x - 5x）</li>
+                            <li>平滑缩放动画</li>
+                            <li>自动跟随鼠标移动</li>
+                            <li>支持多显示器配置</li>
+                            <li>支持远程鼠标监听（UDP）</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-team-line"></i></div>
+                        <h3>适用人群</h3>
+                        <ul>
+                            <li>教学视频创作者</li>
+                            <li>软件演示主播</li>
+                            <li>游戏解说 UP 主</li>
+                            <li>在线课程讲师</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 4: 原版功能回顾 -->
+            <div class="slide" data-slide="4">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-archive-line"></i> 原版基础功能</h2>
+                    <p class="slide-subtitle">v1.0.2 by BlankSourceCode</p>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th><i class="ri-function-line"></i> 功能</th>
+                            <th><i class="ri-chat-info-line"></i> 说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>基础缩放</td>
+                            <td>1-5 倍可调，默认 2 倍</td>
+                        </tr>
+                        <tr>
+                            <td>缩放动画</td>
+                            <td>可调节速度，默认 0.1</td>
+                        </tr>
+                        <tr>
+                            <td>鼠标跟随</td>
+                            <td>追踪光标位置</td>
+                        </tr>
+                        <tr>
+                            <td>边界外跟随</td>
+                            <td>光标移出源边界仍可跟随</td>
+                        </tr>
+                        <tr>
+                            <td>跟随速度</td>
+                            <td>独立调节跟随快慢</td>
+                        </tr>
+                        <tr>
+                            <td>跟随边界</td>
+                            <td>从边缘重新启用跟踪的距离</td>
+                        </tr>
+                        <tr>
+                            <td>锁定灵敏度</td>
+                            <td>触发锁定所需接近程度</td>
+                        </tr>
+                        <tr>
+                            <td>反向自动锁定</td>
+                            <td>反转方向时停止跟随</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="flow-chart">
+                    <div class="flow-chart-title"><i class="ri-braces-line"></i> 核心技术原理</div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">1</div>
+                        <div>使用裁剪滤镜实现缩放效果</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">2</div>
+                        <div>每帧计算目标位置</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">3</div>
+                        <div>线性插值动画实现平滑过渡</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 5: 增强版新增功能概览 -->
+            <div class="slide" data-slide="5">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-gift-line"></i> 中文增强版 · 全新特性</h2>
+                    <p class="slide-subtitle">v2.0 - v2.2 新增功能</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-earth-line"></i></div>
+                        <h3>本地化体验</h3>
+                        <ul>
+                            <li>完整中文界面</li>
+                            <li>中文帮助文档</li>
+                            <li>中文提示信息</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-brain-line"></i></div>
+                        <h3>智能缩放</h3>
+                        <ul>
+                            <li>OBS 启动自动缩放</li>
+                            <li>鼠标静止自动缩小</li>
+                            <li>键盘输入检测保护</li>
+                            <li>移动自动恢复</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-lightbulb-line"></i></div>
+                        <h3>专业优化</h3>
+                        <ul>
+                            <li>动态宽高比适配</li>
+                            <li>二级缩放独立控制</li>
+                            <li>平滑跟随算法</li>
+                            <li>动画曲线优化</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 6: 功能对比表 -->
+            <div class="slide" data-slide="6">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-stack-line"></i> 功能对比一览</h2>
+                    <p class="slide-subtitle">原版 vs 增强版 详细对比</p>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th width="30%"><i class="ri-function-line"></i> 功能</th>
+                            <th width="35%"><i class="ri-git-commit-line"></i> 原版 v1.0.2</th>
+                            <th width="35%"><i class="ri-medal-line"></i> 增强版 v2.2</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>基础缩放</td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>缩放动画</td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span> 优化曲线</td>
+                        </tr>
+                        <tr>
+                            <td>鼠标跟随</td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span> 平滑算法</td>
+                        </tr>
+                        <tr>
+                            <td>边界外跟随</td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                            <td><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>中文界面</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>启动自动缩放</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>动态宽高比</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>静止自动缩小</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>输入检测</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>二级缩放</td>
+                            <td><span class="cross"><i class="ri-close-line"></i></span></td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span></td>
+                        </tr>
+                        <tr>
+                            <td>平滑跟随</td>
+                            <td>基础</td>
+                            <td class="highlight"><span class="check"><i class="ri-check-line"></i></span> 速度预测</td>
+                        </tr>
+                        <tr>
+                            <td>热键数量</td>
+                            <td>2 个</td>
+                            <td class="highlight">4 个</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 幻灯片 7: 中文界面 -->
+            <div class="slide" data-slide="7">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-translate-2"></i> 完整中文本地化</h2>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-layout-grid-line"></i></div>
+                        <h3>界面汉化</h3>
+                        <p>所有设置项中文显示，工具提示完全翻译，错误信息中文化</p>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-folder-settings-line"></i></div>
+                        <h3>设置分类</h3>
+                        <ul>
+                            <li>基本设置</li>
+                            <li>跟随设置</li>
+                            <li>自动缩小设置</li>
+                            <li>键盘检测</li>
+                            <li>高级选项</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-thumbs-up-line"></i></div>
+                        <h3>核心优势</h3>
+                        <ul>
+                            <li>零学习成本</li>
+                            <li>快速上手配置</li>
+                            <li>老人小孩都能用</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 8: 启动自动缩放 -->
+            <div class="slide" data-slide="8">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-flashlight-line"></i> OBS 启动时自动缩放</h2>
+                    <p class="slide-subtitle">无需手动操作，直接进入工作状态</p>
+                </div>
+                <div class="flow-chart">
+                    <div class="flow-chart-title"><i class="ri-flow-chart"></i> 工作流程</div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">1</div>
+                        <div>OBS 启动</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">2</div>
+                        <div>脚本加载</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">3</div>
+                        <div>检测 auto_start = true</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">4</div>
+                        <div>自动激活缩放</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">5</div>
+                        <div>直接进入工作状态</div>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <h3><i class="ri-bullseye-line"></i> 适用场景</h3>
+                    <ul>
+                        <li>固定配置的直播电脑</li>
+                        <li>需要快速开始的录制</li>
+                        <li>忘记快捷键的新手</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 幻灯片 9: 动态宽高比 -->
+            <div class="slide" data-slide="9">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-ruler-2-line"></i> 智能适配画面比例</h2>
+                    <p class="slide-subtitle">动态宽高比功能</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-question-mark"></i></div>
+                        <h3>问题背景</h3>
+                        <ul>
+                            <li>竖屏直播时缩放变形？</li>
+                            <li>多源布局时比例失调？</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-lightbulb-flash-line"></i></div>
+                        <h3>解决方案</h3>
+                        <p>根据画布中源的显示比例自动调整缩放区域，保持缩放区域与画布显示比例一致</p>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-settings-4-line"></i></div>
+                        <h3>技术原理</h3>
+                        <div class="code-block">
+<span class="function">检测源尺寸</span> <span class="arrow">→</span>
+<span class="function">计算宽高比</span> <span class="arrow">→</span>
+<span class="function">动态调整裁剪</span> <span class="arrow">→</span>
+<span class="function">保持比例一致</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <h3><i class="ri-tv-2-line"></i> 实际效果</h3>
+                    <ul>
+                        <li><strong>竖屏直播：</strong>9:16 比例正常</li>
+                        <li><strong>超宽屏幕：</strong>21:9 比例正常</li>
+                        <li><strong>多源混排：</strong>自适应匹配</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 幻灯片 10: 鼠标静止自动缩小 -->
+            <div class="slide" data-slide="10">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-minimize-line"></i> 智能缩回 · 解放双手</h2>
+                    <p class="slide-subtitle">鼠标静止自动缩小功能</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-book-read-line"></i></div>
+                        <h3>功能说明</h3>
+                        <p>鼠标静止超过设定时间后，自动缩小回原始倍率，无需手动切换</p>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-sliders-line"></i></div>
+                        <h3>可配置参数</h3>
+                        <table class="params-table">
+                            <tr>
+                                <th><i class="ri-settings-line"></i> 参数</th>
+                                <th><i class="ri-range-line"></i> 范围</th>
+                                <th><i class="ri-default-line"></i> 默认值</th>
+                            </tr>
+                            <tr>
+                                <td>静止延迟</td>
+                                <td>1-30 秒</td>
+                                <td>3 秒</td>
+                            </tr>
+                            <tr>
+                                <td>检测灵敏度</td>
+                                <td>-</td>
+                                <td>位移&lt;3 像素</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-shield-check-line"></i></div>
+                        <h3>智能保护</h3>
+                        <ul>
+                            <li>键盘输入时不触发</li>
+                            <li>滚轮操作时不触发</li>
+                            <li>鼠标移动立即恢复</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 11: 键盘输入检测 -->
+            <div class="slide" data-slide="11">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-keyboard-line"></i> 输入保护 · 不打断思路</h2>
+                    <p class="slide-subtitle">键盘输入检测功能</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-edit-line"></i></div>
+                        <h3>功能说明</h3>
+                        <p>检测用户正在输入文字或操作滚轮时，禁用自动缩小功能</p>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-crosshair-line"></i></div>
+                        <h3>检测范围</h3>
+                        <ul>
+                            <li><i class="ri-keyboard-box-line"></i> 键盘按键（字母、数字、功能键）</li>
+                            <li><i class="ri-mouse-line"></i> 鼠标滚轮（上/下滚动）</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-time-line"></i></div>
+                        <h3>可配置参数</h3>
+                        <table class="params-table">
+                            <tr>
+                                <th><i class="ri-settings-line"></i> 参数</th>
+                                <th><i class="ri-range-line"></i> 范围</th>
+                                <th><i class="ri-default-line"></i> 默认值</th>
+                            </tr>
+                            <tr>
+                                <td>输入暂停延迟</td>
+                                <td>1-30 秒</td>
+                                <td>2 秒</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="flow-chart">
+                    <div class="flow-chart-title"><i class="ri-flow-chart"></i> 工作流程</div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">1</div>
+                        <div>检测到输入</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">2</div>
+                        <div>重置计时器</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">3</div>
+                        <div>保持放大状态</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">4</div>
+                        <div>停止输入 2 秒后恢复检测</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 12: 二级缩放 -->
+            <div class="slide" data-slide="12">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-focus-3-line"></i> 双级缩放 · 更精细的控制</h2>
+                    <p class="slide-subtitle">独立的二级缩放级别</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-hashtag"></i></div>
+                        <h3>缩放级别</h3>
+                        <ul>
+                            <li><strong>1 级：</strong>原始状态（1x）</li>
+                            <li><strong>2 级：</strong>二级缩放（如 1.5x）</li>
+                            <li><strong>3 级：</strong>最大缩放（如 2x）</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-gamepad-line"></i></div>
+                        <h3>热键操作逻辑</h3>
+                        <div class="code-block">
+<span class="number">第 1 次</span>按下：<span class="string">1x → 1.5x</span>（二级缩放）
+<span class="number">第 2 次</span>按下：<span class="string">1.5x → 2x</span>（最大缩放）
+<span class="number">第 3 次</span>按下：<span class="string">2x → 1.5x</span>（返回二级）
+<span class="number">第 4 次</span>按下：<span class="string">1.5x → 2x</span>（最大缩放）
+                        </div>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-unlock-line"></i></div>
+                        <h3>独立控制</h3>
+                        <ul>
+                            <li>与主缩放热键互不干扰</li>
+                            <li>可配置二级缩放倍数</li>
+                            <li>范围：1.1x - 最大倍数</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 13: 平滑跟随算法 -->
+            <div class="slide" data-slide="13">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-windy-line"></i> 丝滑跟随 · 专业级手感</h2>
+                    <p class="slide-subtitle">v2.2 优化内容</p>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-water-flash-line"></i></div>
+                        <h3>平滑跟随系统</h3>
+                        <ul>
+                            <li>速度预测算法</li>
+                            <li>缓动函数优化</li>
+                            <li>减少微抖动</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-trend-up-line"></i></div>
+                        <h3>动画曲线升级</h3>
+                        <ul>
+                            <li>起步更柔和</li>
+                            <li>收尾更自然</li>
+                            <li>减少机械感</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-equalizer-line"></i></div>
+                        <h3>默认参数优化</h3>
+                        <table class="params-table">
+                            <tr>
+                                <th><i class="ri-settings-line"></i> 参数</th>
+                                <th><i class="ri-arrow-left-line"></i> 旧值</th>
+                                <th><i class="ri-arrow-right-line"></i> 新值</th>
+                            </tr>
+                            <tr>
+                                <td>跟随速度</td>
+                                <td>0.2</td>
+                                <td>0.18</td>
+                            </tr>
+                            <tr>
+                                <td>平滑系数</td>
+                                <td>0.1</td>
+                                <td>0.16</td>
+                            </tr>
+                            <tr>
+                                <td>回弹强度</td>
+                                <td>-</td>
+                                <td>0.010</td>
+                            </tr>
+                            <tr>
+                                <td>回弹上限</td>
+                                <td>-</td>
+                                <td>28</td>
+                            </tr>
+                            <tr>
+                                <td>缩放丝滑度</td>
+                                <td>-</td>
+                                <td>0.88</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <h3><i class="ri-film-line"></i> 视觉效果</h3>
+                    <ul>
+                        <li>小幅移动更稳定</li>
+                        <li>缩放中持续跟随</li>
+                        <li>减少跳变感</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 幻灯片 14: 基本设置 -->
+            <div class="slide" data-slide="14">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-settings-3-line"></i> 基本设置</h2>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th width="25%"><i class="ri-toggle-line"></i> 设置项</th>
+                            <th width="50%"><i class="ri-chat-info-line"></i> 说明</th>
+                            <th width="25%"><i class="ri-thumb-up-line"></i> 推荐值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>缩放源</td>
+                            <td>选择要缩放的显示器捕获源</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>缩放倍数</td>
+                            <td>缩放程度（1-5 倍）</td>
+                            <td>2x</td>
+                        </tr>
+                        <tr>
+                            <td>二级缩放倍数</td>
+                            <td>二级缩放级别（1.1-最大倍数）</td>
+                            <td>1.5x</td>
+                        </tr>
+                        <tr>
+                            <td>缩放速度</td>
+                            <td>缩放动画速度（0.01-1）</td>
+                            <td>0.1</td>
+                        </tr>
+                        <tr>
+                            <td>缩放丝滑度</td>
+                            <td>动画曲线平滑度</td>
+                            <td>0.88</td>
+                        </tr>
+                        <tr>
+                            <td>OBS 启动时自动缩放</td>
+                            <td>启动即激活</td>
+                            <td>按需</td>
+                        </tr>
+                        <tr>
+                            <td>动态宽高比</td>
+                            <td>根据画布源调整比例</td>
+                            <td>✅</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 幻灯片 15: 跟随设置 -->
+            <div class="slide" data-slide="15">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-mouse-line"></i> 跟随设置</h2>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th width="25%"><i class="ri-toggle-line"></i> 设置项</th>
+                            <th width="50%"><i class="ri-chat-info-line"></i> 说明</th>
+                            <th width="25%"><i class="ri-thumb-up-line"></i> 推荐值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>自动跟随鼠标</td>
+                            <td>缩放时跟踪光标</td>
+                            <td>✅</td>
+                        </tr>
+                        <tr>
+                            <td>边界外跟随</td>
+                            <td>光标移出边界也跟随</td>
+                            <td>❌</td>
+                        </tr>
+                        <tr>
+                            <td>跟随速度</td>
+                            <td>缩放区域跟踪速度</td>
+                            <td>0.18</td>
+                        </tr>
+                        <tr>
+                            <td>跟随边界</td>
+                            <td>重新启用跟踪的距离%</td>
+                            <td>0</td>
+                        </tr>
+                        <tr>
+                            <td>锁定灵敏度</td>
+                            <td>触发锁定的接近度</td>
+                            <td>10</td>
+                        </tr>
+                        <tr>
+                            <td>反向自动锁定</td>
+                            <td>反转方向时停止</td>
+                            <td>❌</td>
+                        </tr>
+                        <tr>
+                            <td>平滑跟随</td>
+                            <td>启用速度预测</td>
+                            <td>✅</td>
+                        </tr>
+                        <tr>
+                            <td>平滑系数</td>
+                            <td>控制平滑程度</td>
+                            <td>0.16</td>
+                        </tr>
+                        <tr>
+                            <td>回弹强度</td>
+                            <td>回弹修正力度</td>
+                            <td>0.010</td>
+                        </tr>
+                        <tr>
+                            <td>回弹上限</td>
+                            <td>最大回弹像素</td>
+                            <td>28</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 幻灯片 16: 自动缩小设置 -->
+            <div class="slide" data-slide="16">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-time-line"></i> 自动缩小设置</h2>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th width="25%"><i class="ri-toggle-line"></i> 设置项</th>
+                            <th width="50%"><i class="ri-chat-info-line"></i> 说明</th>
+                            <th width="25%"><i class="ri-thumb-up-line"></i> 推荐值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>鼠标静止自动缩小</td>
+                            <td>静止后自动缩回</td>
+                            <td>按需</td>
+                        </tr>
+                        <tr>
+                            <td>静止延迟 (秒)</td>
+                            <td>静止多久后缩小</td>
+                            <td>3 秒</td>
+                        </tr>
+                        <tr>
+                            <td>检测键盘输入</td>
+                            <td>输入时不自动缩小</td>
+                            <td>按需</td>
+                        </tr>
+                        <tr>
+                            <td>输入暂停延迟 (秒)</td>
+                            <td>停止输入后延迟</td>
+                            <td>2 秒</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="highlight-box">
+                    <h3><i class="ri-lightbulb-line"></i> 使用建议</h3>
+                    <ul>
+                        <li><strong>长时间演示：</strong>关闭自动缩小</li>
+                        <li><strong>短时操作：</strong>开启自动缩小</li>
+                        <li><strong>代码演示：</strong>开启输入检测</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 幻灯片 17: 热键配置指南 -->
+            <div class="slide" data-slide="17">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-cursor-line"></i> 热键配置指南</h2>
+                    <p class="slide-subtitle">四个自定义快捷键</p>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th width="25%"><i class="ri-key-2-line"></i> 热键</th>
+                            <th width="45%"><i class="ri-function-line"></i> 功能</th>
+                            <th width="30%"><i class="ri-gamepad-line"></i> 推荐按键</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>切换鼠标缩放</td>
+                            <td>开启/关闭缩放（直接到最大倍数）</td>
+                            <td>Scroll Lock</td>
+                        </tr>
+                        <tr>
+                            <td>切换二级缩放</td>
+                            <td>二级↔最大倍数切换</td>
+                            <td>Pause</td>
+                        </tr>
+                        <tr>
+                            <td>切换缩放时跟随鼠标</td>
+                            <td>开启/关闭跟随</td>
+                            <td>F12</td>
+                        </tr>
+                        <tr>
+                            <td>切换鼠标静止自动缩小</td>
+                            <td>开启/关闭自动缩小</td>
+                            <td>Insert</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="flow-chart">
+                    <div class="flow-chart-title"><i class="ri-guide-line"></i> 配置方法</div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">1</div>
+                        <div>OBS 设置 → 热键</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">2</div>
+                        <div>找到「脚本」分类</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-number">3</div>
+                        <div>设置对应快捷键</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 18: 使用场景推荐 -->
+            <div class="slide" data-slide="18">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-scene-line"></i> 典型使用场景</h2>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-macbook-line"></i></div>
+                        <h3>教学教程</h3>
+                        <ul>
+                            <li>放大代码编辑区域</li>
+                            <li>自动跟随鼠标</li>
+                            <li>输入时保持放大</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-presentation-line"></i></div>
+                        <h3>软件演示</h3>
+                        <ul>
+                            <li>突出操作重点</li>
+                            <li>文字输入不打断</li>
+                            <li>静止自动缩回</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-pink">
+                        <div class="feature-icon"><i class="ri-gamepad-2-line"></i></div>
+                        <h3>游戏直播</h3>
+                        <ul>
+                            <li>放大关键区域（小地图/技能栏）</li>
+                            <li>快速切换缩放</li>
+                            <li>二级缩放看细节</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-bar-chart-box-line"></i></div>
+                        <h3>数据分析</h3>
+                        <ul>
+                            <li>放大图表细节</li>
+                            <li>动态宽高比适配</li>
+                            <li>长时间演示不累眼</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 19: 常见问题解答 -->
+            <div class="slide" data-slide="19">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-question-line"></i> FAQ 常见问题</h2>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q1: 为什么缩放源列表为空？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>确保场景中已添加显示器捕获源，点击「刷新缩放源」按钮重新获取源列表。</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q2: 缩放位置不准确怎么办？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>启用「设置手动源位置」选项，手动配置显示器的位置和大小信息。</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q3: 如何在非显示器捕获源上使用？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>启用「允许任意缩放源」选项，然后必须设置手动源位置参数。</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q4: 自动缩小不触发？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>检查是否开启了输入检测，或调整静止延迟时间。</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q5: 跟随鼠标有延迟？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>调高跟随速度和平滑系数，启用平滑跟随选项。</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <h3>Q6: 键盘检测无效？</h3>
+                        <span class="faq-icon"><i class="ri-add-line"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>目前键盘检测功能仅支持 Windows 平台，Linux 和 macOS 暂不支持。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 20: 安装与开始 -->
+            <div class="slide" data-slide="20">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-download-cloud-2-line"></i> 安装与开始使用</h2>
+                </div>
+                <div class="cards-grid">
+                    <div class="feature-card accent-blue">
+                        <div class="feature-icon"><i class="ri-install-line"></i></div>
+                        <h3>安装步骤</h3>
+                        <div class="flow-chart" style="margin-top: 14px;">
+                            <div class="flow-step">
+                                <div class="flow-step-number">1</div>
+                                <div>下载 obs-zoom-to-mouse-cn.lua 文件</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">2</div>
+                                <div>打开 OBS Studio</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">3</div>
+                                <div>菜单栏：工具 → 脚本</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">4</div>
+                                <div>点击 + 按钮</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">5</div>
+                                <div>选择下载的 .lua 文件</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">6</div>
+                                <div>在脚本列表中选择并配置</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feature-card accent-purple">
+                        <div class="feature-icon"><i class="ri-rocket-2-line"></i></div>
+                        <h3>快速开始</h3>
+                        <div class="flow-chart" style="margin-top: 14px;">
+                            <div class="flow-step">
+                                <div class="flow-step-number">1</div>
+                                <div>选择「缩放源」为你的显示器</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">2</div>
+                                <div>设置「缩放倍数」（推荐 2x）</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">3</div>
+                                <div>配置热键（推荐 Scroll Lock）</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="flow-step-number">4</div>
+                                <div>按热键开始使用！</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 21: 版本历史 -->
+            <div class="slide" data-slide="21">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-time-flash-line"></i> 版本历史</h2>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-version"><i class="ri-star-line"></i> v2.2 (最新)</div>
+                            <ul>
+                                <li>优化：缩放动画曲线更平滑</li>
+                                <li>优化：移除动态响应，恢复稳定跟随</li>
+                                <li>优化：降低回弹和微抖</li>
+                                <li>优化：缩放中持续跟随</li>
+                                <li>优化：默认参数调整</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-version"><i class="ri-add-line"></i> v2.1</div>
+                            <ul>
+                                <li>新增：二级缩放功能</li>
+                                <li>新增：二级缩放倍数配置</li>
+                                <li>新增：切换二级缩放热键</li>
+                                <li>优化：参数自动限制</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-version"><i class="ri-sparkling-line"></i> v2.0</div>
+                            <ul>
+                                <li>新增：中文界面</li>
+                                <li>新增：启动自动缩放</li>
+                                <li>新增：动态宽高比</li>
+                                <li>新增：鼠标静止自动缩小</li>
+                                <li>新增：键盘输入检测</li>
+                                <li>优化：平滑跟随算法</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-version"><i class="ri-git-commit-line"></i> v1.0.2 (原版)</div>
+                            <ul>
+                                <li>原始版本功能发布</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 幻灯片 22: 版权信息 -->
+            <div class="slide" data-slide="22">
+                <div class="slide-header">
+                    <h2 class="slide-title"><i class="ri-shield-keyhole-line"></i> 版权信息</h2>
+                </div>
+                <div class="credit-section">
+                    <div class="credit-card">
+                        <h3><i class="ri-trophy-line"></i> 原项目</h3>
+                        <p><strong>项目地址：</strong><br><a href="https://github.com/BlankSourceCode/obs-zoom-to-mouse" target="_blank">github.com/BlankSourceCode/obs-zoom-to-mouse</a></p>
+                        <p><strong>原作者：</strong>BlankSourceCode</p>
+                        <p><strong>版本：</strong>v1.0.2</p>
+                        <p><strong>版权：</strong>Copyright (c) BlankSourceCode. All rights reserved.</p>
+                    </div>
+                    <div class="credit-card">
+                        <h3><i class="ri-tools-line"></i> 二次开发版本</h3>
+                        <p><strong>开发者：</strong>SoKei</p>
+                        <p><strong>B 站主页：</strong><br><a href="https://space.bilibili.com/3546772855064749" target="_blank">space.bilibili.com/3546772855064749</a></p>
+                        <p><strong>版本：</strong>v2.2</p>
+                    </div>
+                    <div class="credit-card">
+                        <h3><i class="ri-file-text-line"></i> 使用说明</h3>
+                        <p>1. 保留原作者版权声明</p>
+                        <p>2. 尊重原作者和二次开发者工作</p>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <h3><i class="ri-heart-line"></i> 致谢</h3>
+                    <ul>
+                        <li>感谢 BlankSourceCode 创建的优秀脚本，为二次开发奠定基础。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 幻灯片 23: 结束页 -->
+            <div class="slide end-slide" data-slide="23">
+                <h1 class="end-title">感谢观看</h1>
+                <p class="cover-subtitle">开始使用 OBS 鼠标缩放脚本</p>
+                <div class="end-links">
+                    <a href="https://github.com/BlankSourceCode/obs-zoom-to-mouse" target="_blank" class="end-link">
+                        <div class="end-link-icon"><i class="ri-github-fill"></i></div>
+                        <span class="end-link-text">GitHub 下载</span>
+                    </a>
+                    <a href="https://space.bilibili.com/3546772855064749" target="_blank" class="end-link">
+                        <div class="end-link-icon"><i class="ri-bilibili-fill"></i></div>
+                        <span class="end-link-text">B 站主页</span>
+                    </a>
+                    <a href="../README.md" target="_blank" class="end-link">
+                        <div class="end-link-icon"><i class="ri-file-text-line"></i></div>
+                        <span class="end-link-text">完整文档</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let currentSlideIndex = 0;
+        const totalSlides = 23;
+
+        // 创建粒子背景
+        function createParticles() {
+            const particleBg = document.getElementById('particleBg');
+            const particleCount = 60;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                const size = Math.random() * 5 + 2;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${Math.random() * 100}%`;
+                particle.style.top = `${Math.random() * 100}%`;
+                particle.style.animationDelay = `${Math.random() * 25}s`;
+                particle.style.animationDuration = `${Math.random() * 20 + 20}s`;
+                particleBg.appendChild(particle);
+            }
+        }
+
+        function updateSlide() {
+            // 隐藏所有幻灯片
+            document.querySelectorAll('.slide').forEach(slide => {
+                slide.classList.remove('active');
+                slide.style.display = 'none';
+            });
+
+            // 隐藏所有导航项激活状态
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // 显示当前幻灯片
+            const currentSlide = document.querySelector(`[data-slide="${currentSlideIndex + 1}"]`);
+            if (currentSlide) {
+                // 根据幻灯片类型设置 display 值
+                if (currentSlide.classList.contains('cover-slide') || currentSlide.classList.contains('end-slide')) {
+                    currentSlide.style.display = 'flex';
+                } else {
+                    currentSlide.style.display = 'block';
+                }
+                // 强制重排以触发动画
+                void currentSlide.offsetWidth;
+                currentSlide.classList.add('active');
+            }
+
+            // 激活对应导航项
+            const navItem = document.querySelector(`[data-nav="${currentSlideIndex + 1}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+
+            // 更新计数器
+            document.getElementById('currentSlide').textContent = currentSlideIndex + 1;
+
+            // 更新进度条
+            const progress = ((currentSlideIndex + 1) / totalSlides) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < totalSlides - 1) {
+                currentSlideIndex++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                updateSlide();
+            }
+        }
+
+        function goToSlide(slideNumber) {
+            if (slideNumber >= 1 && slideNumber <= totalSlides) {
+                currentSlideIndex = slideNumber - 1;
+                updateSlide();
+            }
+        }
+
+        function toggleFaq(element) {
+            const faqItem = element.parentElement;
+            // 关闭其他展开的 FAQ
+            document.querySelectorAll('.faq-item.active').forEach(item => {
+                if (item !== faqItem) {
+                    item.classList.remove('active');
+                }
+            });
+            faqItem.classList.toggle('active');
+        }
+
+        // 键盘导航 - 左右方向键翻页
+        document.addEventListener('keydown', (e) => {
+            // 防止在输入框中触发
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // 初始化
+        createParticles();
+        updateSlide();
+    </script>
+</body>
+</html>
