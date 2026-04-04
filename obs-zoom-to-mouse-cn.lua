@@ -451,7 +451,8 @@ function get_zoom_ease(t)
 end
 
 function get_follow_lerp_t(current_crop, target_crop)
-    local base = smoothstep(clamp(0.001, 1, follow_speed))
+    local speed = clamp(0.001, 1, follow_speed)
+    local base = clamp(0.001, 0.9, smoothstep(speed))
     local dx = math.abs(target_crop.x - current_crop.x)
     local dy = math.abs(target_crop.y - current_crop.y)
     local range_x = math.max(1, target_crop.w * 0.35)
@@ -463,7 +464,8 @@ function get_follow_lerp_t(current_crop, target_crop)
         return 0
     end
 
-    return clamp(0.005, 0.9, lerp(base, 0.85, boost))
+    local fast_cap = clamp(base, 0.9, base + 0.08 + speed * 0.2)
+    return clamp(0.001, 0.9, lerp(base, fast_cap, boost))
 end
 
 function get_crop_center(crop)
