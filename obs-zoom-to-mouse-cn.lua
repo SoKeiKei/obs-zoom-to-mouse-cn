@@ -464,8 +464,8 @@ function get_follow_lerp_t(current_crop, target_crop)
         return 0
     end
 
-    local fast_cap = clamp(base, 0.9, base + 0.08 + speed * 0.2)
-    return clamp(0.001, 0.9, lerp(base, fast_cap, boost))
+    local boost_cap = clamp(0.01, 0.25, 0.01 + speed * 0.24)
+    return clamp(0.001, 0.9, base + boost * boost_cap)
 end
 
 function get_crop_center(crop)
