@@ -451,7 +451,7 @@ function get_zoom_ease(t)
 end
 
 function get_follow_lerp_t(current_crop, target_crop)
-    local base = smoothstep(clamp(0.01, 1, follow_speed))
+    local base = smoothstep(clamp(0.001, 1, follow_speed))
     local dx = math.abs(target_crop.x - current_crop.x)
     local dy = math.abs(target_crop.y - current_crop.y)
     local range_x = math.max(1, target_crop.w * 0.35)
@@ -463,7 +463,7 @@ function get_follow_lerp_t(current_crop, target_crop)
         return 0
     end
 
-    return clamp(0.02, 0.9, lerp(base, 0.85, boost))
+    return clamp(0.005, 0.9, lerp(base, 0.85, boost))
 end
 
 function get_crop_center(crop)
@@ -1948,7 +1948,7 @@ function script_properties()
     obs.obs_property_set_long_description(follow_outside_bounds,
         "启用后，即使光标在缩放源边界外也会跟踪鼠标")
 
-    local follow_speed = obs.obs_properties_add_float_slider(props, "follow_speed", "跟随速度", 0.01, 1, 0.01)
+    local follow_speed = obs.obs_properties_add_float_slider(props, "follow_speed", "跟随速度", 0.001, 1, 0.001)
     local follow_border = obs.obs_properties_add_int_slider(props, "follow_border", "跟随边界", 0, 50, 1)
     local safezone_sense = obs.obs_properties_add_int_slider(props,
         "follow_safezone_sensitivity", "锁定灵敏度", 1, 20, 1)
