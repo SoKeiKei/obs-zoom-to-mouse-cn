@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(luacheck:*)",
+      "Bash(lua:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
